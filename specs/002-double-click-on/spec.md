@@ -1,4 +1,4 @@
-# Feature Specification: Edit on-call entry by double-click
+# Feature Specification: Edit on-call entry by single-click
 
 **Feature Branch**: `002-double-click-on`  
 **Created**: 2025-09-23  
@@ -7,11 +7,11 @@
 
 ## Summary
 
-Allow users to quickly edit an existing on-call assignment by double-clicking a calendar entry (pill). The edit modal (or inline editor) allows changing the start and end dates of the assignment, changing the assigned staff member, and removing the assignment. The UI must support drag-and-drop and keyboard-accessible alternatives; the edit workflow should update the underlying per-day assignment data (the visual spanning pill is a rendering convenience only).
+Allow users to quickly edit an existing on-call assignment by single-clicking a calendar entry (pill). The edit modal (or inline editor) allows changing the start and end dates of the assignment, changing the assigned staff member, and removing the assignment. The UI must support drag-and-drop and keyboard-accessible alternatives; the edit workflow should update the underlying per-day assignment data (the visual spanning pill is a rendering convenience only).
 
 ## Execution Flow (main)
 
-1. User double-clicks a calendar pill or focused calendar day with an assignment.
+1. User single-clicks a calendar pill or focused calendar day with an assignment.
 2. UI opens an Edit dialog (modal or inline) pre-filled with:
 	 - `Start Date` (date picker)
 	 - `End Date` (date picker)
@@ -26,12 +26,12 @@ Allow users to quickly edit an existing on-call assignment by double-clicking a 
 ## User Scenarios & Testing
 
 ### Primary User Story
-As a schedule manager, when I double-click an on-call pill I want to quickly change its date range or assigned staff so I can correct or update assignments without re-creating them.
+As a schedule manager, when I single-click an on-call pill I want to quickly change its date range or assigned staff so I can correct or update assignments without re-creating them.
 
 ### Acceptance Scenarios
-1. **Given** an existing multi-day assignment, **When** I double-click a pill and change the `End Date` to an earlier date and click `Save`, **Then** the assignment should be shortened and the UI should show the updated spanning pill and suppressed in-cell pills where appropriate.
-2. **Given** an existing single-day assignment, **When** I double-click and change `Assigned Staff` and click `Save`, **Then** the day should now show the new staff's pill and color.
-3. **Given** an existing assignment, **When** I double-click and click `Remove`, **Then** all per-day assignments for that range are removed and UI updates accordingly.
+1. **Given** an existing multi-day assignment, **When** I single-click a pill and change the `End Date` to an earlier date and click `Save`, **Then** the assignment should be shortened and the UI should show the updated spanning pill and suppressed in-cell pills where appropriate.
+2. **Given** an existing single-day assignment, **When** I single-click and change `Assigned Staff` and click `Save`, **Then** the day should now show the new staff's pill and color.
+3. **Given** an existing assignment, **When** I single-click and click `Remove`, **Then** all per-day assignments for that range are removed and UI updates accordingly.
 
 ### Edge Cases
 - If user sets `Start Date` after `End Date`: the Save action MUST be disabled and a clear validation message shown.
@@ -39,7 +39,7 @@ As a schedule manager, when I double-click an on-call pill I want to quickly cha
 - For multi-week ranges that span multiple week-rows, the UI MUST update spanning pills per-row as defined in the Grid UI spec.
 
 ### Visual & Interaction
-- Double-click opens a modal centered in the viewport or an inline editor anchored to the pill if space permits.
+- Single-click opens a modal centered in the viewport or an inline editor anchored to the pill if space permits.
 - The dialog MUST be keyboard-accessible: focus management, ESC to cancel, Enter to Save.
 - Date pickers MUST allow typing and calendar selection; keyboard navigation inside date picker MUST be supported.
 - The `Assigned Staff` field MUST show the staff color and initials in the selection list.
@@ -47,7 +47,7 @@ As a schedule manager, when I double-click an on-call pill I want to quickly cha
 ## Requirements
 
 ### Functional Requirements
-- **FR-EDIT-001**: Double-clicking a calendar entry MUST open an edit dialog pre-filled with start date, end date, and assigned staff.
+- **FR-EDIT-001**: Single-clicking a calendar entry MUST open an edit dialog pre-filled with start date, end date, and assigned staff.
 - **FR-EDIT-002**: The dialog MUST allow changing the start and end dates within the same calendar (date range picking) and selecting a different staff member.
 - **FR-EDIT-003**: The system MUST validate the date range and prevent invalid saves.
 - **FR-EDIT-004**: The system MUST persist per-day changes so they survive reload.
@@ -61,7 +61,7 @@ As a schedule manager, when I double-click an on-call pill I want to quickly cha
 ### Accessibility Requirements
 - **FR-EDIT-A11Y-001**: Dialog MUST trap focus while open and return focus to a sensible element when closed.
 - **FR-EDIT-A11Y-002**: Dialog controls MUST have accessible labels (aria-label/aria-labelledby).
-- **FR-EDIT-A11Y-003**: Provide keyboard shortcut (e.g., Enter while focused on pill) to open Edit as alternative to double-click.
+- **FR-EDIT-A11Y-003**: Provide keyboard shortcut (e.g., Enter while focused on pill) to open Edit as alternative to single-click.
 
 ## Key Entities
 - **Assignment**: per-day record with date, staffId, optional notes.

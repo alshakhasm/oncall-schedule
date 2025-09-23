@@ -15,9 +15,9 @@ export default function EditAssignmentDialog({ open, rangeStart, rangeEnd, staff
   const valid = new Date(start) <= new Date(end)
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center" role="dialog" aria-modal="true">
-      <div className="absolute inset-0 bg-black opacity-30" onClick={onClose} style={{ zIndex: 50 }} />
-      <div className="bg-white p-4 rounded shadow-lg w-96" style={{ zIndex: 60, position: 'relative' }}>
+    <div className="fixed inset-0 flex items-center justify-center" role="dialog" aria-modal="true" style={{ zIndex: 1000 }}>
+      <div className="absolute inset-0 bg-black opacity-30" onClick={onClose} style={{ zIndex: 1000 }} />
+      <div className="bg-white p-4 rounded shadow-lg w-96" style={{ zIndex: 1001, position: 'relative' }}>
         <div className="flex justify-between items-center">
           <div className="font-bold">Edit Assignment</div>
           <button onClick={onClose}>Close</button>

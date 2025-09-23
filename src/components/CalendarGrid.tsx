@@ -143,8 +143,16 @@ export default function CalendarGrid({ assignments, onDayClick, staff, onDropAss
                                       const colEnd = s.start + s.length + 1
                                       const staffObj = staff?.find(x => x.id === s.staffId)
                                       const label = staffObj?.name ? `${staffObj.name} oncall` : `${s.staffId} oncall`
+                                      const startIso = week[colStart - 1]?.date
+                                      const endIso = week[colEnd - 2]?.date
                                       return (
-                                        <div key={si} className="oncall-bar" style={{ gridColumn: `${colStart} / ${colEnd}`, background: color }}>
+                                        <div key={si}
+                                          className="oncall-bar"
+                                          style={{ gridColumn: `${colStart} / ${colEnd}`, background: color, cursor: 'pointer' }}
+                                          role="button"
+                                          aria-label={`${label} from ${startIso} to ${endIso}`}
+                                          onClick={() => onEditEntry?.(startIso, endIso, s.staffId)}
+                                        >
                                           <div className="oncall-label">{label}</div>
                                         </div>
                                       )
@@ -249,8 +257,16 @@ export default function CalendarGrid({ assignments, onDayClick, staff, onDropAss
                           const label = staffObj?.name ? `${staffObj.name} oncall` : `${s.staffId} oncall`
                           const colStart = s.start + 1
                           const colEnd = s.start + s.length + 1
+                          const startIso = r[s.start]?.date
+                          const endIso = r[s.start + (s.length || 1) - 1]?.date
                           return (
-                            <div key={si} className="oncall-bar" style={{ gridColumn: `${colStart} / ${colEnd}`, background: color }}>
+                            <div key={si}
+                              className="oncall-bar"
+                              style={{ gridColumn: `${colStart} / ${colEnd}`, background: color, cursor: 'pointer' }}
+                              role="button"
+                              aria-label={`${label} from ${startIso} to ${endIso}`}
+                              onClick={() => onEditEntry?.(startIso, endIso, s.staffId)}
+                            >
                               <div className="oncall-label">{label}</div>
                             </div>
                           )

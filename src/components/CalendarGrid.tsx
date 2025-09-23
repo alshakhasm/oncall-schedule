@@ -267,7 +267,33 @@ export default function CalendarGrid({ assignments, onDayClick, staff, onDropAss
                     return (
                       <button
                         key={a.date}
-                        onClick={() => onDayClick?.(a.date)}
+                        onClick={() => {
+                          if (a.staffId) {
+                            // expand contiguous range left/right across days using the map
+                            const staffId = a.staffId
+                            let s = new Date(a.date)
+                            let e = new Date(a.date)
+                            const prev = () => { const d = new Date(s); d.setDate(d.getDate() - 1); return d }
+                            const next = () => { const d = new Date(e); d.setDate(d.getDate() + 1); return d }
+                            // expand left
+                            let p = prev()
+                            while (map[p.toISOString().slice(0,10)]?.staffId === staffId) {
+                              s = new Date(p)
+                              p = prev()
+                            }
+                            // expand right
+                            let n = next()
+                            while (map[n.toISOString().slice(0,10)]?.staffId === staffId) {
+                              e = new Date(n)
+                              n = next()
+                            }
+                            const startIso = s.toISOString().slice(0,10)
+                            const endIso = e.toISOString().slice(0,10)
+                            onEditEntry?.(startIso, endIso, staffId)
+                          } else {
+                            onDayClick?.(a.date)
+                          }
+                        }}
                         onDragOver={(e: any) => { e.preventDefault && e.preventDefault() }}
                         onDragEnter={(e: any) => {
                           e.preventDefault && e.preventDefault()

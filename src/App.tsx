@@ -28,7 +28,12 @@ export default function App() {
   const [rangeStart, setRangeStart] = React.useState('2025-09-01')
   const [rangeEnd, setRangeEnd] = React.useState('2025-09-30')
   const [monthsToShow, setMonthsToShow] = React.useState<number>(() => loadState()?.monthsToShow || 1)
-  const [holidays, setHolidays] = React.useState<string[]>(() => loadState()?.holidays || [])
+  const [holidays, setHolidays] = React.useState<string[]>(() => {
+    const raw = (loadState()?.holidays || []) as string[]
+    // normalize and dedupe
+    const uniq = Array.from(new Set(raw)).sort()
+    return uniq as string[]
+  })
   const [leaves, setLeaves] = React.useState<any[]>(() => loadState()?.leaves || [])
   const [manual, setManual] = React.useState<Record<string,string>>(() => loadState()?.manualAssignments || {})
   const [inspectorDate, setInspectorDate] = React.useState<string | null>(null)
@@ -39,7 +44,23 @@ export default function App() {
     saveState({ staff, holidays, leaves, manualAssignments: manual, monthsToShow })
   }, [staff, holidays, leaves, manual, monthsToShow])
 
-  const assignments: AssignmentMeta[] = computeWeeklyAssignments({ staff, rangeStart, rangeEnd, holidays, leaves, manual })
+  // ensure compute range covers the requested monthsToShow starting at rangeStart
+  const computedRangeEnd = React.useMemo(() => {
+    try {
+      const rs = new Date(rangeStart)
+      const lastMonth = rs.getMonth() + (monthsToShow || 1) - 1
+      // compute last day using UTC to avoid local timezone offsets when serializing
+      const lastDayUtc = new Date(Date.UTC(rs.getFullYear(), lastMonth + 1, 0))
+      return lastDayUtc.toISOString().slice(0,10)
+    } catch {
+      return rangeEnd
+    }
+  }, [rangeStart, monthsToShow, rangeEnd])
+
+  const assignments: AssignmentMeta[] = computeWeeklyAssignments({ staff, rangeStart, rangeEnd: computedRangeEnd, holidays, leaves, manual })
+
+  React.useEffect(() => {
+  }, [rangeStart, computedRangeEnd, assignments.length])
 
 
   function handleAddStaff(s: Staff) {
@@ -47,7 +68,19 @@ export default function App() {
   }
 
   function handleAddHoliday(d: string) {
-    setHolidays(prev => [...prev, d])
+    setHolidays(prev => {
+      if (prev.includes(d)) return prev
+      return [...prev, d].sort()
+    })
+    try {
+      const dt = new Date(d)
+      const rs = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-01`
+      setRangeStart(rs)
+    } catch {}
+  }
+
+  function handleRemoveHoliday(d: string) {
+    setHolidays(prev => prev.filter(h => h !== d))
   }
 
   function handleAddLeave(l: { staffId: string; start: string; end: string }) {
@@ -106,17 +139,24 @@ export default function App() {
   return (
     <div className="flex h-screen">
       <div className="w-72">
-  <SidePanel staff={staff} onAddStaff={handleAddStaff} onExport={handleExport} holidays={holidays} onAddHoliday={handleAddHoliday} onAddLeave={handleAddLeave} onUpdateStaff={handleUpdateStaff} onRemoveStaff={handleRemoveStaff} />
+  <SidePanel staff={staff} onAddStaff={handleAddStaff} onExport={handleExport} holidays={holidays} onAddHoliday={handleAddHoliday} onRemoveHoliday={handleRemoveHoliday} onAddLeave={handleAddLeave} onUpdateStaff={handleUpdateStaff} onRemoveStaff={handleRemoveStaff} />
       </div>
       <div className="flex-1 p-4 overflow-auto">
         <h1 className="text-2xl font-bold">OnCall Scheduler</h1>
-        <TopBar monthsToShow={monthsToShow} onChange={m => setMonthsToShow(m)} />
-        <div className="mt-2">
-          <label className="mr-2">Start</label>
-          <input value={rangeStart} onChange={e => setRangeStart(e.target.value)} className="border p-1" />
-          <label className="ml-4 mr-2">End</label>
-          <input value={rangeEnd} onChange={e => setRangeEnd(e.target.value)} className="border p-1" />
-        </div>
+  <TopBar monthsToShow={monthsToShow} rangeStart={rangeStart} onChange={m => setMonthsToShow(m)} onNavigate={(dir) => {
+          // Advance by one calendar month per click (more intuitive)
+          const rs = new Date(rangeStart)
+          if (dir === 'next') {
+            const newRs = new Date(rs.getFullYear(), rs.getMonth() + 1, 1)
+            const formatted = `${newRs.getFullYear()}-${String(newRs.getMonth()+1).padStart(2,'0')}-${String(newRs.getDate()).padStart(2,'0')}`
+            setRangeStart(formatted)
+          } else {
+            const newRs = new Date(rs.getFullYear(), rs.getMonth() - 1, 1)
+            const formatted = `${newRs.getFullYear()}-${String(newRs.getMonth()+1).padStart(2,'0')}-${String(newRs.getDate()).padStart(2,'0')}`
+            setRangeStart(formatted)
+          }
+        }} />
+        
 
   <CalendarGrid assignments={assignments} staff={staff} rangeStart={rangeStart} monthsToShow={monthsToShow} onDayClick={d => setInspectorDate(d)} onDropAssign={(date, sid) => handleAssign(date, sid)} onDragAnnounce={m => setLiveMessage(m)} onEditEntry={(s,e,sid) => setEditRange({ start: s, end: e, staffId: sid })} />
   <div aria-live="polite" role="status" className="sr-only" id="drag-live">{liveMessage}</div>
@@ -136,8 +176,59 @@ export default function App() {
           rangeEnd={editRange?.end || ''}
           staff={staff}
           selectedStaffId={editRange?.staffId}
-          onSave={(s,e,sid) => handleEditAssignment(s,e,sid)}
-          onRemove={() => { if (editRange) handleEditAssignment(editRange.start, editRange.end, undefined) }}
+          onSave={(s, e, sid) => {
+            // When editing an assignment (auto or manual), convert the original full range into
+            // explicit manual overrides so the saved start/end exactly controls the visible pill extent.
+            setManual(prev => {
+              const copy = { ...prev }
+              if (!editRange) {
+                // just apply new range
+                for (let d = new Date(s); d <= new Date(e); d.setDate(d.getDate() + 1)) {
+                  const iso = d.toISOString().slice(0,10)
+                  if (sid) copy[iso] = sid
+                  else copy[iso] = ''
+                }
+                return copy
+              }
+
+              const origStart = new Date(editRange.start)
+              const origEnd = new Date(editRange.end)
+              const newStart = new Date(s)
+              const newEnd = new Date(e)
+
+              // compute union range to ensure surrounding days are cleared when shrinking
+              const unionStart = origStart < newStart ? origStart : newStart
+              const unionEnd = origEnd > newEnd ? origEnd : newEnd
+
+              for (let d = new Date(unionStart); d <= unionEnd; d.setDate(d.getDate() + 1)) {
+                const iso = d.toISOString().slice(0,10)
+                // if this day falls within the new saved range, assign sid (or explicit unassign '')
+                if (d >= newStart && d <= newEnd) {
+                  if (sid) copy[iso] = sid
+                  else copy[iso] = ''
+                } else {
+                  // outside new range but inside original union -> explicitly unassign
+                  copy[iso] = ''
+                }
+              }
+
+              return copy
+            })
+            setEditRange(null)
+          }}
+          onRemove={() => {
+            if (!editRange) return
+            // set explicit unassign manual entries (empty string) so they are treated as manual overrides
+            setManual(prev => {
+              const copy = { ...prev }
+              for (let d = new Date(editRange.start); d <= new Date(editRange.end); d.setDate(d.getDate() + 1)) {
+                const iso = d.toISOString().slice(0,10)
+                copy[iso] = ''
+              }
+              return copy
+            })
+            setEditRange(null)
+          }}
           onClose={() => setEditRange(null)}
         />
       </div>

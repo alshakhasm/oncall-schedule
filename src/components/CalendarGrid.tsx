@@ -151,7 +151,49 @@ export default function CalendarGrid({ assignments, onDayClick, staff, onDropAss
                                           style={{ gridColumn: `${colStart} / ${colEnd}`, background: color, cursor: 'pointer' }}
                                           role="button"
                                           aria-label={`${label} from ${startIso} to ${endIso}`}
-                                          onClick={() => onEditEntry?.(startIso, endIso, s.staffId)}
+                                          onClick={() => {
+                                            try {
+                                              const staffId = s.staffId
+                                              // temporary debug logging to inspect map entries across month boundary
+                                              console.log('overlay-click debug', { startIso, endIso, staffId })
+                                              console.log('map 2025-10-01..2025-10-04:', map['2025-10-01'], map['2025-10-02'], map['2025-10-03'], map['2025-10-04'])
+                                              if (!staffId) return
+                                              const safeIso = (d: Date) => {
+                                                if (isNaN(d.getTime())) return null
+                                                return d.toISOString().slice(0,10)
+                                              }
+                                              let sDate = new Date(startIso)
+                                              let eDate = new Date(endIso)
+                                              // expand left safely
+                                              let p = new Date(sDate)
+                                              p.setDate(p.getDate() - 1)
+                                              while (true) {
+                                                const iso = safeIso(p)
+                                                if (!iso) break
+                                                const entry = map[iso]
+                                                if (!entry || entry.staffId !== staffId) break
+                                                sDate = new Date(p)
+                                                p.setDate(p.getDate() - 1)
+                                              }
+                                              // expand right safely
+                                              let n = new Date(eDate)
+                                              n.setDate(n.getDate() + 1)
+                                              while (true) {
+                                                const iso = safeIso(n)
+                                                if (!iso) break
+                                                const entry = map[iso]
+                                                if (!entry || entry.staffId !== staffId) break
+                                                eDate = new Date(n)
+                                                n.setDate(n.getDate() + 1)
+                                              }
+                                              const fullStart = safeIso(sDate) || startIso
+                                              const fullEnd = safeIso(eDate) || endIso
+                                              onEditEntry?.(fullStart, fullEnd, staffId)
+                                            } catch (err) {
+                                              // fallback to original range if expansion fails
+                                              onEditEntry?.(startIso, endIso, s.staffId)
+                                            }
+                                          }}
                                         >
                                           <div className="oncall-label">{label}</div>
                                         </div>
@@ -188,13 +230,13 @@ export default function CalendarGrid({ assignments, onDayClick, staff, onDropAss
                                       const sid = e.dataTransfer?.getData('text/plain')
                                       if (sid) onDropAssign?.(d.date, sid)
                                     }}
-                                    className="relative p-0.5 border rounded text-xxs bg-white text-left mini-day"
-                                    aria-label={`Date ${d.date}. ${d.holiday ? 'Holiday.' : d.staffId ? `Assigned to ${d.staffId}.` : 'No assignment.'}`}
+                                    className={`relative p-0.5 border rounded text-xxs bg-white text-left mini-day ${d.holiday ? 'holiday' : ''}`}
+                                    aria-label={`Date ${d.date}. ${d.holiday ? `Holiday${d.holiday && (d as any).holidayName ? `: ${(d as any).holidayName}` : ''}.` : d.staffId ? `Assigned to ${d.staffId}.` : 'No assignment.'}`}
                                     data-tooltip={tooltip}
                                   >
                                     <div className="day-number text-xxs font-mono">{new Date(d.date).getDate()}</div>
                                       <div className="mt-0.5">
-                                        {d.holiday ? <span className="text-red-600 text-xxs">H</span> : d.staffId ? null : <span className="text-gray-400">·</span>}
+                                        {d.holiday ? null : d.staffId ? null : <span className="text-gray-400">·</span>}
                                       </div>
                                       {!coveredByMulti && d.staffId && (
                                         <div className="in-cell-pill" style={{ background: staffObj?.color || 'rgba(124,58,237,0.8)' }}>
@@ -344,14 +386,14 @@ export default function CalendarGrid({ assignments, onDayClick, staff, onDropAss
                         data-date={a.date}
                         className={`relative p-2 border rounded text-sm bg-white text-left card ${(() => {
                           const d = new Date(a.date); const key = `${d.getFullYear()}-${d.getMonth()+1}`
-                          return firstSundayByMonth[key] === a.date ? 'month-anchor' : ''
+                          return `${firstSundayByMonth[key] === a.date ? 'month-anchor' : ''} ${a.holiday ? 'holiday' : ''}`.trim()
                         })()}`}
                         role="gridcell"
-                        aria-label={`Date ${a.date}. ${a.holiday ? 'Holiday.' : a.staffId ? `Assigned to ${a.staffId}.` : 'No assignment.'}`}
+                        aria-label={`Date ${a.date}. ${a.holiday ? `Holiday${a.holiday && (a as any).holidayName ? `: ${(a as any).holidayName}` : ''}.` : a.staffId ? `Assigned to ${a.staffId}.` : 'No assignment.'}`}
                       >
                         <div className="day-number font-mono text-xs">{new Date(a.date).getDate()}</div>
                         <div className="mt-1">
-                          {a.holiday ? <span className="text-red-600">Holiday</span> : a.staffId ? null : <span className="text-gray-400">—</span>}
+                          {a.holiday ? null : a.staffId ? null : <span className="text-gray-400">—</span>}
                         </div>
                         {!coveredBy && a.staffId && (
                           <div className="in-cell-pill" style={{ background: staff?.find(s => s.id === a.staffId)?.color || 'rgba(124,58,237,0.8)' }}>
@@ -359,7 +401,6 @@ export default function CalendarGrid({ assignments, onDayClick, staff, onDropAss
                           </div>
                         )}
                         <div className="text-xs mt-1">
-                          {a.manual && <span className="mr-2 text-blue-600">manual</span>}
                           {a.leave && <span className="mr-2 text-orange-600">leave</span>}
                           {a.needs_review && <span className="mr-2 text-red-600">needs_review</span>}
                         </div>

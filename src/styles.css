@@ -10,6 +10,8 @@
 	--accent: #7c3aed; /* estheric-500 */
 	--accent-strong: #4c1d95; /* estheric-800 */
 	--accent-warn: #ff6b6b;
+	--pill-font: 14px;
+	--pill-padding-x: 12px;
 }
 
 body { font-family: 'Inter', ui-sans-serif, system-ui; background: var(--bg); color: #0f172a }
@@ -39,16 +41,35 @@ body { font-family: 'Inter', ui-sans-serif, system-ui; background: var(--bg); co
 .tab { background: transparent; border: 1px solid rgba(15,23,42,0.06); padding: 6px 10px; border-radius: 6px; cursor: pointer }
 .tab-selected { background: var(--accent); color: white; border-color: var(--accent-strong) }
 
+.nav-btn { background: transparent; border: 1px solid rgba(15,23,42,0.06); padding: 6px 8px; border-radius: 6px; cursor: pointer }
+.nav-btn:hover { background: rgba(124,58,237,0.04) }
+.topbar .font-semibold { font-size: 14px }
+
 /* compact 3-month view styles */
 .compact-months { align-items: flex-start }
 .mini-month { width: 240px; padding: 6px }
 .mini-month .text-sm { font-size: 13px }
-.mini-day { height: 38px; display: flex; flex-direction: column; align-items: flex-start; padding: 4px }
+.mini-day { height: 56px; display: flex; flex-direction: column; align-items: flex-start; padding: 6px }
 .text-xxs { font-size: 10px }
 
 @media (max-width: 768px) {
 	.compact-months { flex-direction: column }
 	.mini-month { width: 100% }
+}
+
+/* Responsive day heights */
+@media (max-width: 640px) {
+	.mini-day { height: 44px !important; gap: 3px }
+	.card[role="gridcell"] { min-height: 44px }
+	.in-cell-pill { height: 20px; bottom: 6px }
+	:root { --pill-font: 12px; --pill-padding-x: 10px }
+}
+
+@media (max-width: 420px) {
+	.mini-day { height: 40px !important; gap: 2px }
+	.card[role="gridcell"] { min-height: 40px }
+	.in-cell-pill { height: 18px; bottom: 5px }
+	:root { --pill-font: 11px; --pill-padding-x: 8px }
 }
 
 /* Tooltip for compact mini-days */
@@ -66,7 +87,8 @@ body { font-family: 'Inter', ui-sans-serif, system-ui; background: var(--bg); co
 }
 
 .mini-month { padding: 6px }
-.mini-day { height: 36px; gap: 2px }
+.mini-day { height: 52px; gap: 4px }
+.card[role="gridcell"] { min-height: 56px; display: flex; flex-direction: column; justify-content: flex-start }
 .compact-months { gap: 10px }
 
 /* consistent day number placement */
@@ -75,11 +97,11 @@ body { font-family: 'Inter', ui-sans-serif, system-ui; background: var(--bg); co
 
 /* compact-specific oncall pill sizing */
 .compact-months .oncall-bar { height: 21px; border-radius: 10px; opacity: 0.85; transform: none; display: flex; align-items: center; justify-content: center; }
-.compact-months .oncall-bar .oncall-label { font-size: 12px; padding: 0 8px; line-height: 1; max-width: 100%; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; color: rgba(255,255,255,0.95); }
+.compact-months .oncall-bar .oncall-label { font-size: calc(var(--pill-font) - 2px); padding: 0 calc(var(--pill-padding-x) - 4px); line-height: 1; max-width: 100%; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; color: rgba(255,255,255,0.95); }
 
 /* full-size oncall bars (default) */
 .oncall-bar { height: 27px; border-radius: 12px; opacity: 0.9; transform: none; display: flex; align-items: center; justify-content: center; }
-.oncall-bar .oncall-label { font-size: 14px; padding: 0 12px; line-height: 1; max-width: 100%; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; color: rgba(255,255,255,0.95); }
+.oncall-bar .oncall-label { font-size: var(--pill-font); padding: 0 var(--pill-padding-x); line-height: 1; max-width: 100%; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; color: rgba(255,255,255,0.95); }
 
 /* Ensure oncall-bar visually contrasts over white day cells */
 .oncall-bar { box-shadow: 0 4px 10px rgba(12,12,18,0.12); }
@@ -98,8 +120,15 @@ body { font-family: 'Inter', ui-sans-serif, system-ui; background: var(--bg); co
 
 /* in-cell pill styling */
 .in-cell-pill { position: absolute; left: 10px; right: 10px; bottom: 8px; height: 24px; border-radius: 12px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 8px rgba(12,12,18,0.08); color: rgba(255,255,255,0.95); padding: 0 10px }
-.in-cell-pill .oncall-label { font-size: 13px; line-height: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100% }
+.in-cell-pill .oncall-label { font-size: calc(var(--pill-font) - 1px); line-height: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100% }
 .mini-month .in-cell-pill { height: 20px; border-radius: 10px; bottom: 6px }
+
+/* Holiday cell visual treatment (red highlight) */
+.holiday { background: linear-gradient(180deg, #fff1f2, #fee2e2); border-color: rgba(239,68,68,0.08); }
+.holiday .day-number { color: #7f1d1d }
+.holiday .in-cell-pill { opacity: 0.75 }
+.holiday[data-has-assignment="true"] .in-cell-pill { opacity: 0.9 }
+
 
 
 

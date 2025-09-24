@@ -12,6 +12,17 @@ export default function SidePanel({ staff, onAddStaff, onExport, holidays, onAdd
   const [leaveStart, setLeaveStart] = React.useState('')
   const [leaveEnd, setLeaveEnd] = React.useState('')
   const [color, setColor] = React.useState('#7c3aed')
+  const canAddHoliday = React.useMemo(() => {
+    if (!holidayStart) return false
+    if (!holidayEnd) return true
+    try {
+      const s = new Date(holidayStart)
+      const e = new Date(holidayEnd)
+      return e.getTime() >= s.getTime()
+    } catch {
+      return false
+    }
+  }, [holidayStart, holidayEnd])
   return (
   <div className="p-4 border-r card">
       <div className="flex items-center justify-between">
@@ -115,18 +126,28 @@ export default function SidePanel({ staff, onAddStaff, onExport, holidays, onAdd
             />
           </div>
           <div className="flex gap-2">
-            <button className="p-2 bg-yellow-500 text-white text-sm rounded" onClick={() => {
-              if (!holidayStart) return
-              const start = new Date(holidayStart)
-              const end = holidayEnd ? new Date(holidayEnd) : new Date(holidayStart)
-              const dates: string[] = []
-              for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-                dates.push(d.toISOString().slice(0,10))
-              }
-              dates.forEach(dt => onAddHoliday?.(dt))
-              setHolidayStart('')
-              setHolidayEnd('')
-            }}>Add</button>
+            <button
+              className={`p-2 text-white text-sm rounded ${canAddHoliday ? 'bg-yellow-500' : 'bg-gray-300 cursor-not-allowed'}`}
+              disabled={!canAddHoliday}
+              onClick={() => {
+                if (!canAddHoliday) return
+                const start = new Date(holidayStart)
+                const end = holidayEnd ? new Date(holidayEnd) : new Date(holidayStart)
+                if (end.getTime() < start.getTime()) return
+                const dates: string[] = []
+                for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                  dates.push(d.toISOString().slice(0,10))
+                }
+                dates.forEach(dt => onAddHoliday?.(dt))
+                setHolidayStart('')
+                setHolidayEnd('')
+              }}
+            >Add</button>
+            <button
+              className="p-2 border text-sm rounded"
+              aria-label="Clear holiday selection"
+              onClick={() => { setHolidayStart(''); setHolidayEnd('') }}
+            >Clear</button>
           </div>
         </div>
       </div>

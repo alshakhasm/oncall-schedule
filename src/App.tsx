@@ -25,7 +25,7 @@ function saveState(obj: any) {
 
 export default function App() {
   const [staff, setStaff] = React.useState<Staff[]>(() => loadState()?.staff || [{ id: 'A', name: 'Alice', color: '#7c3aed' }, { id: 'B', name: 'Bob', color: '#059669' }])
-  const [rangeStart, setRangeStart] = React.useState('2025-09-01')
+  const [rangeStart, setRangeStart] = React.useState<string>(() => loadState()?.rangeStart || '2025-09-01')
   const [rangeEnd, setRangeEnd] = React.useState('2025-09-30')
   const [monthsToShow, setMonthsToShow] = React.useState<number>(() => loadState()?.monthsToShow || 1)
   const [autoSchedule, setAutoSchedule] = React.useState<boolean>(() => loadState()?.autoSchedule ?? false)
@@ -42,8 +42,8 @@ export default function App() {
   const [editRange, setEditRange] = React.useState<{ start: string; end: string; staffId?: string } | null>(null)
 
   React.useEffect(() => {
-    saveState({ staff, holidays, leaves, manualAssignments: manual, monthsToShow, autoSchedule })
-  }, [staff, holidays, leaves, manual, monthsToShow, autoSchedule])
+    saveState({ staff, holidays, leaves, manualAssignments: manual, monthsToShow, autoSchedule, rangeStart })
+  }, [staff, holidays, leaves, manual, monthsToShow, autoSchedule, rangeStart])
 
   // ensure compute range covers the requested monthsToShow starting at rangeStart
   const computedRangeEnd = React.useMemo(() => {

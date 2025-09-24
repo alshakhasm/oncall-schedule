@@ -31,15 +31,19 @@ export function computeWeeklyAssignments(options: {
   holidays?: string[]
   leaves?: Leave[]
   manual?: Record<string, string>
+  auto?: boolean
 }): AssignmentMeta[] {
-  const { staff, rangeStart, rangeEnd, holidays = [], leaves = [], manual = {} } = options
+  const { staff, rangeStart, rangeEnd, holidays = [], leaves = [], manual = {}, auto = true } = options
 
   // Build list of all dates in interval
   const days = eachDayOfInterval({ start: parseISO(rangeStart), end: parseISO(rangeEnd) })
 
-  // Use a fixed epoch Sunday as rotation anchor so assignments are stable
-  // across different visible ranges. 1970-01-04 is a Sunday (the first Sunday after epoch).
-  const firstSunday = parseISO('1970-01-04')
+  // Determine an anchor Sunday for rotation: the Sunday on-or-before rangeStart
+  const rangeStartDate = parseISO(rangeStart)
+  let firstSunday = rangeStartDate
+  while (firstSunday.getDay() !== 0) {
+    firstSunday = addDays(firstSunday, -1)
+  }
 
   const result: AssignmentMeta[] = []
   let rotationIndex = 0
@@ -64,6 +68,9 @@ export function computeWeeklyAssignments(options: {
     if (hasManual) {
       assignId = manualStaff || undefined
     } else if (isHoliday || isWeekend(day)) {
+      assignId = undefined
+    } else if (!auto) {
+      // auto-scheduling disabled -> leave unassigned unless manual
       assignId = undefined
     } else {
       // weekly assignment: only assign on Sundays as rotation anchors; for weekdays, use the staff assigned for that week.

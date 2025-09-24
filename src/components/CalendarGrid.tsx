@@ -66,10 +66,11 @@ export default function CalendarGrid({ assignments, onDayClick, staff, onDropAss
   }
 
   // If compact 3-month view requested, render three small month grids side-by-side
-  if (monthsToShow === 3 && rangeStart) {
+  if ((monthsToShow === 3 || monthsToShow === 6) && rangeStart) {
     const rs = new Date(rangeStart)
+    const count = monthsToShow === 6 ? 6 : 3
     const months: { year: number; month: number; days: AssignmentMeta[] }[] = []
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < count; i++) {
       const m = new Date(rs.getFullYear(), rs.getMonth() + i, 1)
       const year = m.getFullYear(), month = m.getMonth()
       const days: AssignmentMeta[] = []
@@ -83,7 +84,7 @@ export default function CalendarGrid({ assignments, onDayClick, staff, onDropAss
 
     return (
       <div className="mt-4">
-        <div className="flex gap-3 compact-months" role="grid" aria-label="Three month compact view">
+        <div className={`compact-months ${monthsToShow === 6 ? 'six-months' : 'flex gap-3'}`} role="grid" aria-label={`${count} month compact view`}>
           {months.map((mBlock, idx) => (
             <div key={idx} className="mini-month card p-2" role="group" aria-label={`${mBlock.year}-${mBlock.month+1}`}>
               <div className="text-sm font-semibold mb-1">{new Date(mBlock.year, mBlock.month, 1).toLocaleString(undefined,{ month: 'long', year: 'numeric' })}</div>
@@ -112,7 +113,9 @@ export default function CalendarGrid({ assignments, onDayClick, staff, onDropAss
                       }
                       monthWeeks.push(wk)
                     }
-                    return monthWeeks.map((week, wi) => {
+                    // Ensure a week is only shown in one month by owning the week via Sunday's month
+                    const filteredWeeks = monthWeeks.filter(wk => new Date(wk[0].date).getMonth() === month)
+                    return filteredWeeks.map((week, wi) => {
                       // compute segments for this week
                       const segments: { start: number; length: number; staffId?: string }[] = []
                       let segStart = -1; let segStaff: string | undefined = undefined
@@ -267,7 +270,11 @@ export default function CalendarGrid({ assignments, onDayClick, staff, onDropAss
           {weekdayHeader().map(h => <div key={h} className="p-1" role="columnheader">{h}</div>)}
         </div>
         <div className="mt-2 space-y-1">
-          {weeks.map((r, ri) => {
+          {(() => {
+            const anchorMonth = (rangeStart ? new Date(rangeStart) : first).getMonth()
+            // Week ownership anchored to Sunday: show week only in the month of its Sunday
+            const displayWeeks = weeks.filter(wk => new Date(wk[0].date).getMonth() === anchorMonth)
+            return displayWeeks.map((r, ri) => {
             const trailing = 0
             // compute contiguous segments of same staff across this week
             const segments: { start: number; length: number; staffId?: string }[] = []
@@ -411,7 +418,8 @@ export default function CalendarGrid({ assignments, onDayClick, staff, onDropAss
                 </div>
               </div>
             )
-          })}
+            })
+          })()}
         </div>
       </div>
     </div>

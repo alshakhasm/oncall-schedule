@@ -28,6 +28,7 @@ export default function App() {
   const [rangeStart, setRangeStart] = React.useState('2025-09-01')
   const [rangeEnd, setRangeEnd] = React.useState('2025-09-30')
   const [monthsToShow, setMonthsToShow] = React.useState<number>(() => loadState()?.monthsToShow || 1)
+  const [autoSchedule, setAutoSchedule] = React.useState<boolean>(() => loadState()?.autoSchedule ?? false)
   const [holidays, setHolidays] = React.useState<string[]>(() => {
     const raw = (loadState()?.holidays || []) as string[]
     // normalize and dedupe
@@ -41,8 +42,8 @@ export default function App() {
   const [editRange, setEditRange] = React.useState<{ start: string; end: string; staffId?: string } | null>(null)
 
   React.useEffect(() => {
-    saveState({ staff, holidays, leaves, manualAssignments: manual, monthsToShow })
-  }, [staff, holidays, leaves, manual, monthsToShow])
+    saveState({ staff, holidays, leaves, manualAssignments: manual, monthsToShow, autoSchedule })
+  }, [staff, holidays, leaves, manual, monthsToShow, autoSchedule])
 
   // ensure compute range covers the requested monthsToShow starting at rangeStart
   const computedRangeEnd = React.useMemo(() => {
@@ -57,7 +58,7 @@ export default function App() {
     }
   }, [rangeStart, monthsToShow, rangeEnd])
 
-  const assignments: AssignmentMeta[] = computeWeeklyAssignments({ staff, rangeStart, rangeEnd: computedRangeEnd, holidays, leaves, manual })
+  const assignments: AssignmentMeta[] = computeWeeklyAssignments({ staff, rangeStart, rangeEnd: computedRangeEnd, holidays, leaves, manual, auto: autoSchedule })
 
   React.useEffect(() => {
   }, [rangeStart, computedRangeEnd, assignments.length])
@@ -127,35 +128,48 @@ export default function App() {
   }
 
   function handleRemoveStaff(id: string) {
+    // capture dates currently assigned to this staff in visible range
+    const datesToClear = assignments.filter(a => a.staffId === id).map(a => a.date)
     setStaff(prev => prev.filter(s => s.id !== id))
-    // also remove manual assignments to this staff
+    // remove manual entries pointing to this staff and explicitly unassign their dates
     setManual(prev => {
       const copy = { ...prev }
       for (const k of Object.keys(copy)) if (copy[k] === id) delete copy[k]
+      datesToClear.forEach(d => { copy[d] = '' })
       return copy
     })
   }
 
+
   return (
     <div className="flex h-screen">
-      <div className="w-72">
-  <SidePanel staff={staff} onAddStaff={handleAddStaff} onExport={handleExport} holidays={holidays} onAddHoliday={handleAddHoliday} onRemoveHoliday={handleRemoveHoliday} onAddLeave={handleAddLeave} onUpdateStaff={handleUpdateStaff} onRemoveStaff={handleRemoveStaff} />
-      </div>
+    <div className="w-72">
+  <SidePanel staff={staff} onAddStaff={handleAddStaff} onExport={handleExport} holidays={holidays} onAddHoliday={handleAddHoliday} onRemoveHoliday={handleRemoveHoliday} onAddLeave={handleAddLeave} onUpdateStaff={handleUpdateStaff} onRemoveStaff={handleRemoveStaff} autoSchedule={autoSchedule} onToggleAuto={setAutoSchedule} />
+    </div>
       <div className="flex-1 p-4 overflow-auto">
         <h1 className="text-2xl font-bold">OnCall Scheduler</h1>
-  <TopBar monthsToShow={monthsToShow} rangeStart={rangeStart} onChange={m => setMonthsToShow(m)} onNavigate={(dir) => {
-          // Advance by one calendar month per click (more intuitive)
-          const rs = new Date(rangeStart)
-          if (dir === 'next') {
-            const newRs = new Date(rs.getFullYear(), rs.getMonth() + 1, 1)
+  <TopBar
+          monthsToShow={monthsToShow}
+          rangeStart={rangeStart}
+          onChange={(m) => {
+            setMonthsToShow(m)
+            if (m === 6) {
+              // Anchor six-month view to January of the current anchor year
+              const rs = new Date(rangeStart)
+              const jan = new Date(rs.getFullYear(), 0, 1)
+              const formatted = `${jan.getFullYear()}-${String(jan.getMonth()+1).padStart(2,'0')}-${String(jan.getDate()).padStart(2,'0')}`
+              setRangeStart(formatted)
+            }
+          }}
+          onNavigate={(dir) => {
+            const rs = new Date(rangeStart)
+            const step = monthsToShow === 6 ? 6 : 1
+            const delta = dir === 'next' ? step : -step
+            const newRs = new Date(rs.getFullYear(), rs.getMonth() + delta, 1)
             const formatted = `${newRs.getFullYear()}-${String(newRs.getMonth()+1).padStart(2,'0')}-${String(newRs.getDate()).padStart(2,'0')}`
             setRangeStart(formatted)
-          } else {
-            const newRs = new Date(rs.getFullYear(), rs.getMonth() - 1, 1)
-            const formatted = `${newRs.getFullYear()}-${String(newRs.getMonth()+1).padStart(2,'0')}-${String(newRs.getDate()).padStart(2,'0')}`
-            setRangeStart(formatted)
-          }
-        }} />
+          }}
+        />
         
 
   <CalendarGrid assignments={assignments} staff={staff} rangeStart={rangeStart} monthsToShow={monthsToShow} onDayClick={d => setInspectorDate(d)} onDropAssign={(date, sid) => handleAssign(date, sid)} onDragAnnounce={m => setLiveMessage(m)} onEditEntry={(s,e,sid) => setEditRange({ start: s, end: e, staffId: sid })} />

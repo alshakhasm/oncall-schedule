@@ -92,11 +92,27 @@ export default function SidePanel({ staff, onAddStaff, onExport, holidays, onAdd
             <button aria-label="Pick holiday start" title="Pick holiday start" className="p-2 border rounded" onClick={() => { const el = startRef.current; if (!el) return; if ((el as any).showPicker) try { (el as any).showPicker(); return } catch {} el.click() }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 11H9V13H7V11Z" fill="currentColor"/><path d="M11 11H13V13H11V11Z" fill="currentColor"/><path d="M15 11H17V13H15V11Z" fill="currentColor"/><path d="M19 4H18V2H16V4H8V2H6V4H5C3.9 4 3 4.9 3 6V20C3 21.1 3.9 22 5 22H19C20.1 22 21 21.1 21 20V6C21 4.9 20.1 4 19 4ZM19 20H5V9H19V20Z" fill="currentColor"/></svg>
             </button>
+            <input
+              type="text"
+              aria-label="selected holiday start"
+              placeholder="Start YYYY-MM-DD"
+              value={holidayStart}
+              readOnly
+              className="border p-2 text-sm w-40 bg-white rounded"
+            />
 
             <input ref={endRef} type="date" aria-label="holiday end" value={holidayEnd} onChange={e => setHolidayEnd(e.target.value)} className="sr-only" />
             <button aria-label="Pick holiday end" title="Pick holiday end" className="p-2 border rounded" onClick={() => { const el = endRef.current; if (!el) return; if ((el as any).showPicker) try { (el as any).showPicker(); return } catch {} el.click() }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 11H9V13H7V11Z" fill="currentColor"/><path d="M11 11H13V13H11V11Z" fill="currentColor"/><path d="M15 11H17V13H15V11Z" fill="currentColor"/><path d="M19 4H18V2H16V4H8V2H6V4H5C3.9 4 3 4.9 3 6V20C3 21.1 3.9 22 5 22H19C20.1 22 21 21.1 21 20V6C21 4.9 20.1 4 19 4ZM19 20H5V9H19V20Z" fill="currentColor"/></svg>
             </button>
+            <input
+              type="text"
+              aria-label="selected holiday end"
+              placeholder="End YYYY-MM-DD"
+              value={holidayEnd}
+              readOnly
+              className="border p-2 text-sm w-40 bg-white rounded"
+            />
           </div>
           <div className="flex gap-2">
             <button className="p-2 bg-yellow-500 text-white text-sm rounded" onClick={() => {

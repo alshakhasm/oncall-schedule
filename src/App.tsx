@@ -30,6 +30,7 @@ export default function App() {
   const [rangeStart, setRangeStart] = React.useState<string>(() => loadState()?.rangeStart || '2025-09-01')
   const [rangeEnd, setRangeEnd] = React.useState('2025-09-30')
   const [monthsToShow, setMonthsToShow] = React.useState<number>(() => loadState()?.monthsToShow || 1)
+  const [rangeMode, setRangeMode] = React.useState<'months' | 'ytd'>(() => loadState()?.rangeMode || 'months')
   const [autoSchedule, setAutoSchedule] = React.useState<boolean>(() => loadState()?.autoSchedule ?? false)
   const [holidays, setHolidays] = React.useState<string[]>(() => {
     const raw = (loadState()?.holidays || []) as string[]
@@ -44,8 +45,8 @@ export default function App() {
   const [editRange, setEditRange] = React.useState<{ start: string; end: string; staffId?: string } | null>(null)
 
   React.useEffect(() => {
-    saveState({ staff, holidays, leaves, manualAssignments: manual, monthsToShow, autoSchedule, rangeStart })
-  }, [staff, holidays, leaves, manual, monthsToShow, autoSchedule, rangeStart])
+    saveState({ staff, holidays, leaves, manualAssignments: manual, monthsToShow, autoSchedule, rangeStart, rangeMode })
+  }, [staff, holidays, leaves, manual, monthsToShow, autoSchedule, rangeStart, rangeMode])
 
   // Migration: ensure staff IDs are unique; if duplicates found, reassign and update references
   React.useEffect(() => {
@@ -86,22 +87,46 @@ export default function App() {
   // ensure compute range covers the requested monthsToShow starting at rangeStart
   const computedRangeEnd = React.useMemo(() => {
     try {
+      if (rangeMode === 'ytd') {
+        const now = new Date()
+        const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+        return lastDay.toISOString().slice(0,10)
+      }
       const rs = new Date(rangeStart)
       const lastMonth = rs.getMonth() + (monthsToShow || 1) - 1
-      // compute last day using UTC to avoid local timezone offsets when serializing
       const lastDayUtc = new Date(Date.UTC(rs.getFullYear(), lastMonth + 1, 0))
       return lastDayUtc.toISOString().slice(0,10)
     } catch {
       return rangeEnd
     }
-  }, [rangeStart, monthsToShow, rangeEnd])
+  }, [rangeStart, monthsToShow, rangeEnd, rangeMode])
 
-  const assignments: AssignmentMeta[] = computeWeeklyAssignments({ staff, rangeStart, rangeEnd: computedRangeEnd, holidays, leaves, manual, auto: autoSchedule })
+  // For YTD mode, force rangeStart = Jan 1 current year
+  const effectiveRangeStart = React.useMemo(() => {
+    if (rangeMode === 'ytd') {
+      const now = new Date()
+      return `${now.getFullYear()}-01-01`
+    }
+    return rangeStart
+  }, [rangeStart, rangeMode])
+
+  const assignments: AssignmentMeta[] = computeWeeklyAssignments({ staff, rangeStart: effectiveRangeStart, rangeEnd: computedRangeEnd, holidays, leaves, manual, auto: autoSchedule })
   const [activeTab, setActiveTab] = React.useState<'calendar' | 'report'>('calendar')
   const reportRows = React.useMemo(() => {
     if (activeTab !== 'report') return []
     return computeOnCallReport({ staff, assignments, holidays, leaves })
   }, [activeTab, staff, assignments, holidays, leaves])
+
+  // Keyboard shortcut Shift+Y to activate YTD
+  React.useEffect(() => {
+    function handler(e: KeyboardEvent) {
+      if (e.key.toLowerCase() === 'y' && e.shiftKey) {
+        setRangeMode('ytd')
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   React.useEffect(() => {
   }, [rangeStart, computedRangeEnd, assignments.length])
@@ -193,7 +218,7 @@ export default function App() {
         <h1 className="text-2xl font-bold">OnCall Scheduler</h1>
   <TopBar
           monthsToShow={monthsToShow}
-          rangeStart={rangeStart}
+          rangeStart={effectiveRangeStart}
     activeTab={activeTab}
     onTabChange={setActiveTab}
     onJumpToCurrent={() => {
@@ -201,18 +226,21 @@ export default function App() {
       const first = new Date(now.getFullYear(), now.getMonth(), 1)
       const formatted = `${first.getFullYear()}-${String(first.getMonth()+1).padStart(2,'0')}-${String(first.getDate()).padStart(2,'0')}`
       setRangeStart(formatted)
+      setRangeMode('months')
     }}
           onChange={(m) => {
             setMonthsToShow(m)
+            setRangeMode('months')
             if (m === 6) {
               // Anchor six-month view to January of the current anchor year
-              const rs = new Date(rangeStart)
+              const rs = new Date(effectiveRangeStart)
               const jan = new Date(rs.getFullYear(), 0, 1)
               const formatted = `${jan.getFullYear()}-${String(jan.getMonth()+1).padStart(2,'0')}-${String(jan.getDate()).padStart(2,'0')}`
               setRangeStart(formatted)
             }
           }}
           onNavigate={(dir) => {
+            if (rangeMode === 'ytd') return // disable navigation in YTD mode
             const rs = new Date(rangeStart)
             const step = monthsToShow === 6 ? 6 : 1
             const delta = dir === 'next' ? step : -step
@@ -220,11 +248,15 @@ export default function App() {
             const formatted = `${newRs.getFullYear()}-${String(newRs.getMonth()+1).padStart(2,'0')}-${String(newRs.getDate()).padStart(2,'0')}`
             setRangeStart(formatted)
           }}
+          onYtd={() => {
+            setRangeMode('ytd')
+          }}
+          rangeMode={rangeMode}
         />
         
   {activeTab === 'calendar' && (
     <>
-      <CalendarGrid assignments={assignments} staff={staff} rangeStart={rangeStart} monthsToShow={monthsToShow} onDayClick={d => setInspectorDate(d)} onDropAssign={(date, sid) => handleAssign(date, sid)} onDragAnnounce={m => setLiveMessage(m)} onEditEntry={(s,e,sid) => setEditRange({ start: s, end: e, staffId: sid })} />
+  <CalendarGrid assignments={assignments} staff={staff} rangeStart={effectiveRangeStart} monthsToShow={rangeMode === 'ytd' ? undefined : monthsToShow} ytd={rangeMode === 'ytd'} onDayClick={d => setInspectorDate(d)} onDropAssign={(date, sid) => handleAssign(date, sid)} onDragAnnounce={m => setLiveMessage(m)} onEditEntry={(s,e,sid) => setEditRange({ start: s, end: e, staffId: sid })} />
       <div aria-live="polite" role="status" className="sr-only" id="drag-live">{liveMessage}</div>
     </>
   )}

@@ -8,11 +8,13 @@ type Props = {
   activeTab?: 'calendar' | 'report'
   onTabChange?: (tab: 'calendar' | 'report') => void
   onJumpToCurrent?: () => void
+  onYtd?: () => void
+  rangeMode?: 'months' | 'ytd'
 }
 
 const options = [1, 3, 6]
 
-export default function TopBar({ monthsToShow, onChange, onNavigate, rangeStart, activeTab = 'calendar', onTabChange, onJumpToCurrent }: Props) {
+export default function TopBar({ monthsToShow, onChange, onNavigate, rangeStart, activeTab = 'calendar', onTabChange, onJumpToCurrent, onYtd, rangeMode = 'months' }: Props) {
   let monthLabel = ''
   if (rangeStart) {
     const rs = new Date(rangeStart)
@@ -52,6 +54,16 @@ export default function TopBar({ monthsToShow, onChange, onNavigate, rangeStart,
               </button>
             )
           })}
+          <button
+            type="button"
+            role="tab"
+            aria-selected={rangeMode === 'ytd'}
+            className={`tab ${rangeMode === 'ytd' ? 'tab-selected' : ''}`}
+            onClick={() => onYtd?.()}
+            title="Year to date"
+          >
+            YTD
+          </button>
           <button
             type="button"
             className="tab"

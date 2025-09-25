@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2025-09-23T00:00:00Z",
+  "staff": [{ "id": "A", "name": "Alice" }, { "id": "B", "name": "Bob" }],
+  "holidays": ["2025-12-25"],
+  "leaves": [{ "staffId": "A", "start": "2025-09-02", "end": "2025-09-04" }],
+  "manualAssignments": { "2025-09-03": "B" }
+}

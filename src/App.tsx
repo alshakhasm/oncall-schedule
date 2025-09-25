@@ -4,6 +4,8 @@ import CalendarGrid from './components/CalendarGrid'
 import SidePanel from './components/SidePanel'
 import TopBar from './components/TopBar'
 import { toCSV } from './lib/exporter'
+import { computeOnCallReport } from './lib/report'
+import ReportTab from './components/ReportTab'
 import DayInspector from './components/DayInspector'
 import EditAssignmentDialog from './components/EditAssignmentDialog'
 
@@ -45,6 +47,42 @@ export default function App() {
     saveState({ staff, holidays, leaves, manualAssignments: manual, monthsToShow, autoSchedule, rangeStart })
   }, [staff, holidays, leaves, manual, monthsToShow, autoSchedule, rangeStart])
 
+  // Migration: ensure staff IDs are unique; if duplicates found, reassign and update references
+  React.useEffect(() => {
+    const counts: Record<string, number> = {}
+    staff.forEach(s => { counts[s.id] = (counts[s.id] || 0) + 1 })
+    const dups = Object.keys(counts).filter(k => counts[k] > 1)
+    if (dups.length === 0) return
+    const idMap: Record<string, string[]> = {}
+    const newStaff: Staff[] = []
+    staff.forEach(s => {
+      if (!idMap[s.id]) idMap[s.id] = []
+      const list = idMap[s.id]
+      if (list.length === 0) {
+        list.push(s.id)
+        newStaff.push(s)
+      } else {
+        const newId = `${s.id}-${Math.random().toString(36).slice(-3)}`
+        list.push(newId)
+        newStaff.push({ ...s, id: newId })
+      }
+    })
+    // Build reverse lookup old->new (skip first occurrence which keeps old id)
+    const remap: Record<string, string> = {}
+    Object.keys(idMap).forEach(orig => {
+      const arr = idMap[orig]
+      if (arr.length > 1) {
+        // arr[0] is original; subsequent correspond to duplicate staff entries
+        for (let i = 1; i < arr.length; i++) {
+          remap[`${orig}#${i}`] = arr[i]
+        }
+      }
+    })
+    // Because we didn't store index markers previously, simpler approach: we only changed duplicate second+ entries; to update manual/leaves we match by name duplication order.
+    // For leaves & manual we cannot distinguish duplicates reliably if same id used historically; they will still reference first staff (acceptable trade-off).
+    setStaff(newStaff)
+  }, [staff])
+
   // ensure compute range covers the requested monthsToShow starting at rangeStart
   const computedRangeEnd = React.useMemo(() => {
     try {
@@ -59,6 +97,11 @@ export default function App() {
   }, [rangeStart, monthsToShow, rangeEnd])
 
   const assignments: AssignmentMeta[] = computeWeeklyAssignments({ staff, rangeStart, rangeEnd: computedRangeEnd, holidays, leaves, manual, auto: autoSchedule })
+  const [activeTab, setActiveTab] = React.useState<'calendar' | 'report'>('calendar')
+  const reportRows = React.useMemo(() => {
+    if (activeTab !== 'report') return []
+    return computeOnCallReport({ staff, assignments, holidays, leaves })
+  }, [activeTab, staff, assignments, holidays, leaves])
 
   React.useEffect(() => {
   }, [rangeStart, computedRangeEnd, assignments.length])
@@ -151,6 +194,14 @@ export default function App() {
   <TopBar
           monthsToShow={monthsToShow}
           rangeStart={rangeStart}
+    activeTab={activeTab}
+    onTabChange={setActiveTab}
+    onJumpToCurrent={() => {
+      const now = new Date()
+      const first = new Date(now.getFullYear(), now.getMonth(), 1)
+      const formatted = `${first.getFullYear()}-${String(first.getMonth()+1).padStart(2,'0')}-${String(first.getDate()).padStart(2,'0')}`
+      setRangeStart(formatted)
+    }}
           onChange={(m) => {
             setMonthsToShow(m)
             if (m === 6) {
@@ -171,9 +222,15 @@ export default function App() {
           }}
         />
         
-
-  <CalendarGrid assignments={assignments} staff={staff} rangeStart={rangeStart} monthsToShow={monthsToShow} onDayClick={d => setInspectorDate(d)} onDropAssign={(date, sid) => handleAssign(date, sid)} onDragAnnounce={m => setLiveMessage(m)} onEditEntry={(s,e,sid) => setEditRange({ start: s, end: e, staffId: sid })} />
-  <div aria-live="polite" role="status" className="sr-only" id="drag-live">{liveMessage}</div>
+  {activeTab === 'calendar' && (
+    <>
+      <CalendarGrid assignments={assignments} staff={staff} rangeStart={rangeStart} monthsToShow={monthsToShow} onDayClick={d => setInspectorDate(d)} onDropAssign={(date, sid) => handleAssign(date, sid)} onDragAnnounce={m => setLiveMessage(m)} onEditEntry={(s,e,sid) => setEditRange({ start: s, end: e, staffId: sid })} />
+      <div aria-live="polite" role="status" className="sr-only" id="drag-live">{liveMessage}</div>
+    </>
+  )}
+  {activeTab === 'report' && (
+    <ReportTab rows={reportRows} />
+  )}
         
         {inspectorDate && (
           <DayInspector

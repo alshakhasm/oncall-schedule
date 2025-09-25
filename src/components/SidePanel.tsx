@@ -1,6 +1,12 @@
 import React from 'react'
 import { Staff } from '../lib/scheduler'
 
+function genId(name: string) {
+  const base = name.replace(/[^A-Za-z0-9]/g,'').toUpperCase().slice(0,3) || 'X'
+  const rand = Math.random().toString(36).slice(-4)
+  return `${base}-${rand}`
+}
+
 export default function SidePanel({ staff, onAddStaff, onExport, holidays, onAddHoliday, onRemoveHoliday, onAddLeave, onUpdateStaff, onRemoveStaff, autoSchedule, onToggleAuto }: { staff: Staff[]; onAddStaff: (s: Staff) => void; onExport: () => void; holidays?: string[]; onAddHoliday?: (d: string) => void; onRemoveHoliday?: (d: string) => void; onAddLeave?: (l: { staffId: string; start: string; end: string }) => void; onUpdateStaff?: (s: Staff) => void; onRemoveStaff?: (id: string) => void; autoSchedule?: boolean; onToggleAuto?: (v: boolean) => void }) {
   const [name, setName] = React.useState('')
   const [holiday, setHoliday] = React.useState('')
@@ -11,6 +17,12 @@ export default function SidePanel({ staff, onAddStaff, onExport, holidays, onAdd
   const [leaveStaff, setLeaveStaff] = React.useState(staff[0]?.id || '')
   const [leaveStart, setLeaveStart] = React.useState('')
   const [leaveEnd, setLeaveEnd] = React.useState('')
+  // Ensure selected leaveStaff always points to existing staff
+  React.useEffect(() => {
+    if (leaveStaff && !staff.find(s => s.id === leaveStaff)) {
+      setLeaveStaff(staff[0]?.id || '')
+    }
+  }, [staff, leaveStaff])
   const [color, setColor] = React.useState('#7c3aed')
   const canAddHoliday = React.useMemo(() => {
     if (!holidayStart) return false
@@ -49,7 +61,7 @@ export default function SidePanel({ staff, onAddStaff, onExport, holidays, onAdd
       <div className="mt-3 flex gap-2 min-w-0">
         <input value={name} onChange={e => setName(e.target.value)} placeholder="Name" className="border p-1 flex-1 min-w-0 rounded" />
         <input aria-label="color" value={color} onChange={e => setColor(e.target.value)} type="color" className="w-8 h-6 p-0 border" />
-        <button className="px-2 py-1 bg-estheric-500 text-white rounded" onClick={() => { if (name.trim()) { onAddStaff({ id: name.trim().slice(0,3), name: name.trim(), color }); setName('') } }}>Add</button>
+  <button className="px-2 py-1 bg-estheric-500 text-white rounded" onClick={() => { if (name.trim()) { onAddStaff({ id: genId(name.trim()), name: name.trim(), color }); setName('') } }}>Add</button>
       </div>
 
       <div className="mt-4">

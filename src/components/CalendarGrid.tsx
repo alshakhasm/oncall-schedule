@@ -5,7 +5,7 @@ function weekdayHeader() {
   return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 }
 
-export default function CalendarGrid({ assignments, onDayClick, staff, onDropAssign, onDragAnnounce, monthsToShow, rangeStart, onEditEntry }: { assignments: AssignmentMeta[]; onDayClick?: (date: string) => void; staff?: Staff[]; onDropAssign?: (date: string, staffId: string) => void; onDragAnnounce?: (msg: string) => void; monthsToShow?: number; rangeStart?: string; onEditEntry?: (start: string, end: string, staffId?: string) => void }) {
+export default function CalendarGrid({ assignments, onDayClick, staff, onDropAssign, onDragAnnounce, monthsToShow, rangeStart, onEditEntry, ytd }: { assignments: AssignmentMeta[]; onDayClick?: (date: string) => void; staff?: Staff[]; onDropAssign?: (date: string, staffId: string) => void; onDragAnnounce?: (msg: string) => void; monthsToShow?: number; rangeStart?: string; onEditEntry?: (start: string, end: string, staffId?: string) => void; ytd?: boolean }) {
   const sorted = [...assignments].sort((a,b)=> a.date.localeCompare(b.date))
   if (sorted.length === 0) return <div />
 
@@ -66,6 +66,129 @@ export default function CalendarGrid({ assignments, onDayClick, staff, onDropAss
   }
 
   // If compact 3-month view requested, render three small month grids side-by-side
+  if (ytd && rangeStart) {
+    // Render months from Jan to current month as grid tiles (similar to six-month but dynamic count)
+    const rs = new Date(rangeStart) // should be Jan 1 current year
+    const now = new Date()
+    const monthCount = now.getMonth() + 1 // months are 0-based, +1 to include current month
+    const months: { year: number; month: number; days: AssignmentMeta[] }[] = []
+    for (let i = 0; i < monthCount; i++) {
+      const m = new Date(rs.getFullYear(), i, 1)
+      const year = m.getFullYear(), month = m.getMonth()
+      const days: AssignmentMeta[] = []
+      const lastDay = new Date(year, month + 1, 0).getDate()
+      for (let d = 1; d <= lastDay; d++) {
+        const iso = new Date(year, month, d).toISOString().slice(0,10)
+        days.push(map[iso] || ({ date: iso } as AssignmentMeta))
+      }
+      months.push({ year, month, days })
+    }
+    return (
+      <div className="mt-4">
+        <div className="compact-months six-months" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))' }} role="grid" aria-label={`YTD view ${monthCount} months`}>
+          {months.map((mBlock, idx) => (
+            <div key={idx} className="mini-month card p-2" role="group" aria-label={`${mBlock.year}-${mBlock.month+1}`}>
+              <div className="text-sm font-semibold mb-1">{new Date(mBlock.year, mBlock.month, 1).toLocaleString(undefined,{ month: 'long', year: 'numeric' })}</div>
+              <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium">
+                {weekdayHeader().map(h => <div key={h} className="p-0.5">{h.slice(0,1)}</div>)}
+              </div>
+              <div className="mt-1 space-y-1">
+                {(() => {
+                  const year = mBlock.year, month = mBlock.month
+                  const firstDay = new Date(year, month, 1)
+                  const lastDay = new Date(year, month + 1, 0)
+                  const start = new Date(firstDay)
+                  while (start.getDay() !== 0) start.setDate(start.getDate() - 1)
+                  const end = new Date(lastDay)
+                  while (end.getDay() !== 6) end.setDate(end.getDate() + 1)
+                  const monthWeeks: AssignmentMeta[][] = []
+                  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 7)) {
+                    const wk: AssignmentMeta[] = []
+                    for (let i = 0; i < 7; i++) {
+                      const cell = new Date(d); cell.setDate(d.getDate() + i)
+                      const iso = cell.toISOString().slice(0,10)
+                      wk.push(map[iso] || ({ date: iso } as AssignmentMeta))
+                    }
+                    monthWeeks.push(wk)
+                  }
+                  const filteredWeeks = monthWeeks.filter(wk => new Date(wk[0].date).getMonth() === month)
+                  return filteredWeeks.map((week, wi) => {
+                    const segments: { start: number; length: number; staffId?: string }[] = []
+                    let segStart = -1; let segStaff: string | undefined = undefined
+                    for (let i = 0; i < week.length; i++) {
+                      const cell = week[i]
+                      if (cell && cell.staffId) {
+                        if (segStart === -1) { segStart = i; segStaff = cell.staffId }
+                        else if (segStaff !== cell.staffId) { segments.push({ start: segStart, length: i - segStart, staffId: segStaff }); segStart = i; segStaff = cell.staffId }
+                      } else {
+                        if (segStart !== -1) { segments.push({ start: segStart, length: i - segStart, staffId: segStaff }); segStart = -1; segStaff = undefined }
+                      }
+                    }
+                    if (segStart !== -1) segments.push({ start: segStart, length: week.length - segStart, staffId: segStaff })
+                    return (
+                      <div key={wi} className="relative" role="row">
+                        {(() => {
+                          const multi = segments.filter(s => (s.length || 0) > 1)
+                          if (multi.length === 0) return null
+                          return (
+                            <div className="absolute inset-0 pointer-events-none oncall-overlay">
+                              <div className="overlay-grid h-full w-full">
+                                {multi.map((s, si) => {
+                                  if (!s.staffId) return null
+                                  const color = staff?.find(x => x.id === s.staffId)?.color || 'rgba(124,58,237,0.6)'
+                                  const colStart = s.start + 1
+                                  const colEnd = s.start + s.length + 1
+                                  const staffObj = staff?.find(x => x.id === s.staffId)
+                                  const label = staffObj?.name ? `${staffObj.name} oncall` : `${s.staffId} oncall`
+                                  const startIso = week[colStart - 1]?.date
+                                  const endIso = week[colEnd - 2]?.date
+                                  return (
+                                    <div key={si}
+                                      className="oncall-bar"
+                                      style={{ gridColumn: `${colStart} / ${colEnd}`, background: color, cursor: 'pointer' }}
+                                      role="button"
+                                      aria-label={`${label} from ${startIso} to ${endIso}`}
+                                      onClick={() => onEditEntry?.(startIso, endIso, s.staffId)}
+                                    >
+                                      <div className="oncall-label">{label}</div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )
+                        })()}
+                        <div className="grid grid-cols-7 gap-1" role="presentation">
+                          {week.map((d, idx) => {
+                            const staffObj = staff?.find(s => s.id === d.staffId)
+                            const tooltip = d.holiday ? 'Holiday' : d.staffId ? `${staffObj?.name || d.staffId}` : 'No assignment'
+                            const coveredByMulti = segments.some(s => (s.length || 0) > 1 && idx >= s.start && idx < s.start + (s.length || 0))
+                            const today = new Date().toISOString().slice(0,10) === d.date
+                            return (
+                              <button key={d.date} onClick={() => d.staffId ? onEditEntry?.(d.date, d.date, d.staffId) : onDayClick?.(d.date)} className={`relative p-0.5 border rounded text-xxs bg-white text-left mini-day ${d.holiday ? 'holiday' : ''} ${today ? 'today' : ''}`} data-tooltip={tooltip} aria-label={`Date ${d.date}. ${today ? 'Today. ' : ''}${d.holiday ? 'Holiday.' : d.staffId ? `Assigned to ${d.staffId}.` : 'No assignment.'}`}>
+                                <div className="day-number text-xxs font-mono">{new Date(d.date).getDate()}</div>
+                                <div className="mt-0.5">{d.holiday ? null : d.staffId ? null : <span className="text-gray-400">·</span>}</div>
+                                {!coveredByMulti && d.staffId && (
+                                  <div className="in-cell-pill" style={{ background: staffObj?.color || 'rgba(124,58,237,0.8)' }}>
+                                    <div className="oncall-label">{staffObj?.name || d.staffId}</div>
+                                  </div>
+                                )}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })
+                })()}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   if ((monthsToShow === 3 || monthsToShow === 6) && rangeStart) {
     const rs = new Date(rangeStart)
     const count = monthsToShow === 6 ? 6 : 3
